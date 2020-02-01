@@ -4,26 +4,26 @@ def ACCOUNT_REGISTRY_PREFIX
 def GIT_COMMIT_HASH
 
 pipeline {
+environment {
+    registry = "shalinyp/example-webapp"
+    registryCredential = 'munich'
+    dockerImage = ''
+  }
     agent any
     stages {
-        stage('Checkout Source Code and Logging Into Registry') {
-            steps {
-                echo 'Logging Into the Private ECR Registry'
-                script {
-                    GIT_COMMIT_HASH = sh (script: "git log -n 1 --pretty=format:'%H'", returnStdout: true)
-                    ACCOUNT_REGISTRY_PREFIX = "089778365617.dkr.ecr.us-east-1.amazonaws.com"
-                    sh """
-                    \$(aws ecr get-login --no-include-email --region us-east-1)
-                    """
-                }
-            }
+        stage('Checkout Source Code and Logging Into Docker hub') {
+              steps{
+				script {
+					docker.build registry + ":$BUILD_NUMBER"
+				}
+			}
         }
 
         stage('Make A Builder Image') {
             steps {
                 echo 'Starting to build the project builder docker image'
                 script {
-                    builderImage = docker.build("${ACCOUNT_REGISTRY_PREFIX}/example-webapp-builder:${GIT_COMMIT_HASH}", "-f ./Dockerfile.builder .")
+                    builderImage = docker.build("registry:${GIT_COMMIT_HASH}", "-f ./Dockerfile.builder .")
                     builderImage.push()
                     builderImage.push("${env.GIT_BRANCH}")
                     builderImage.inside('-v $WORKSPACE:/output -u root') {
@@ -54,7 +54,7 @@ pipeline {
             steps {
                 echo 'Starting to build docker image'
                 script {
-                    productionImage = docker.build("${ACCOUNT_REGISTRY_PREFIX}/example-webapp:${GIT_COMMIT_HASH}")
+                    productionImage = docker.build("registry:${GIT_COMMIT_HASH}")
                     productionImage.push()
                     productionImage.push("${env.GIT_BRANCH}")
                 }
